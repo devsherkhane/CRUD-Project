@@ -1,4 +1,4 @@
-# Course Management System
+# CRUD-Project
 
 A full-stack application built with:
 
@@ -6,16 +6,10 @@ A full-stack application built with:
 - MySQL
 - Vue 3 (Frontend)
 
-## Features
-- Add course
-- View courses
-- Update course
-- Delete course
-
 ## Tech Stack
 - Go + Gorilla Mux
 - MySQL
-- Vue 3 + Axios
+- Vue 3 + Vue router
 
 ## How to Run
 1. Start Go backend
