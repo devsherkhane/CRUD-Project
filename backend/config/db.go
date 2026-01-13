@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"database/sql"
@@ -12,7 +12,7 @@ var DB *sql.DB
 
 func ConnectDB() {
 	var err error
-
+	// Database credentials from your original db.go
 	dsn := "root:9595520628@@tcp(127.0.0.1:3306)/student_db"
 	DB, err = sql.Open("mysql", dsn)
 
