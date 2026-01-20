@@ -24,25 +24,25 @@
             <th>Actions</th>
           </tr>
         </thead>
+
         <tbody>
           <tr v-for="s in students" :key="s.id">
             <td class="photo-cell">
-              <img 
-                v-if="s.photo" 
-                :src="'http://localhost:8000/uploads/' + s.photo" 
-                alt="Student"
+              <img
+                v-if="s.photo"
+                :src="'http://localhost:8000/uploads/' + s.photo"
                 class="student-img"
               />
               <div v-else class="no-photo">N/A</div>
             </td>
-            
+
             <td>
               <input v-if="editId === s.id" v-model="editData.studentName" />
               <span v-else>{{ s.studentName }}</span>
             </td>
 
             <td>
-              <input v-if="editId === s.id" v-model="editData.email" type="email" />
+              <input v-if="editId === s.id" v-model="editData.email" />
               <span v-else>{{ s.email }}</span>
             </td>
 
@@ -80,34 +80,43 @@
             </td>
 
             <td>
-              <input v-if="editId === s.id" v-model="editData.dob" type="date" />
+              <input v-if="editId === s.id" type="date" v-model="editData.dob" />
               <span v-else>{{ s.dob }}</span>
             </td>
 
             <td>
-              <input v-if="editId === s.id" v-model="editData.bloodGroup" class="small-input" />
+              <input
+                v-if="editId === s.id"
+                v-model="editData.bloodGroup"
+                class="small-input"
+              />
               <span v-else>{{ s.bloodGroup }}</span>
             </td>
 
             <td class="center-text">
-              <input v-if="editId === s.id" v-model="editData.handicapped" type="checkbox" />
+              <input
+                v-if="editId === s.id"
+                type="checkbox"
+                v-model="editData.handicapped"
+              />
               <span v-else>{{ s.handicapped ? 'Yes' : 'No' }}</span>
             </td>
 
             <td>
               <div v-if="editId === s.id" class="action-buttons">
-                <button class="save-btn" @click="updateStudent(s.id)">Save</button>
+                <button class="save-btn" @click="updateStudent">Save</button>
                 <button class="cancel-btn" @click="editId = null">Cancel</button>
               </div>
               <div v-else class="action-buttons">
                 <button class="edit-btn" @click="startEdit(s)">Edit</button>
-                <button class="delete-btn" @click="deleteStudent(s.id)">Delete</button>
+                <button class="delete-btn" @click="deleteStudent(s)">Delete</button>
               </div>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
+    <button class="pdf-btn" @click="downloadPDF">Download PDF</button>
   </div>
 </template>
 
@@ -118,35 +127,56 @@ const students = ref([]);
 const editId = ref(null);
 const editData = ref({});
 
+const downloadPDF = () => {
+  window.open('http://localhost:8000/students/pdf', '_blank');
+};
+
+
+// FETCH STUDENTS
 const fetchStudents = async () => {
-  const res = await fetch('http://localhost:8000/students');
+  const res = await fetch('http://localhost:8000/students', {
+    credentials: 'include'
+  });
   students.value = await res.json();
 };
 
-const deleteStudent = async (id) => {
-  if (confirm('Are you sure you want to delete this record?')) {
-    await fetch(`http://localhost:8000/students/${id}`, { method: 'DELETE' });
-    fetchStudents();
-  }
-};
-
+// START EDIT
 const startEdit = (student) => {
-  editId.value = student.id;
+  editId.value = String(student.id); // IMPORTANT: string comparison
   editData.value = { ...student };
 };
 
-const updateStudent = async (id) => {
-  await fetch(`http://localhost:8000/students/${id}`, {
+// UPDATE STUDENT
+const updateStudent = async () => {
+  await fetch('http://localhost:8000/students', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify(editData.value)
   });
+
   editId.value = null;
+  fetchStudents();
+};
+
+// DELETE STUDENT (SEND ID)
+const deleteStudent = async (student) => {
+  if (!confirm('Are you sure you want to delete this record?')) return;
+
+  await fetch('http://localhost:8000/students', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ id: student.id })
+  });
+
   fetchStudents();
 };
 
 onMounted(fetchStudents);
 </script>
+
+
 
 <style scoped>
 .list-session {

@@ -14,6 +14,8 @@ func main() {
 	// 1. Connect to Database
 	config.ConnectDB()
 
+	config.InitSession()
+
 	// 2. Ensure uploads directory exists
 	_ = os.Mkdir("./uploads", os.ModePerm)
 
@@ -30,7 +32,8 @@ func main() {
 
 func enableCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 

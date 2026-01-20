@@ -9,8 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-
-	"github.com/gorilla/mux"
 )
 
 func CreateStudent(w http.ResponseWriter, r *http.Request) {
@@ -25,6 +23,7 @@ func CreateStudent(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		defer file.Close()
 		fileName = handler.Filename
+
 		dst, _ := os.Create(filepath.Join("./uploads", fileName))
 		defer dst.Close()
 		io.Copy(dst, file)
@@ -32,33 +31,39 @@ func CreateStudent(w http.ResponseWriter, r *http.Request) {
 
 	handicapped, _ := strconv.ParseBool(r.FormValue("handicapped"))
 
-	query := `INSERT INTO students 
-	(studentName, address, state, district, taluka, gender, dob, photo, handicapped, email, mobileNumber, bloodGroup)
+	query := `INSERT INTO students
+	(studentName, address, state, district, taluka, gender, dob, photo, handicapped, 
+	email, mobileNumber, bloodGroup)
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
-	result, err := config.DB.Exec(query,
-		r.FormValue("studentName"),
-		r.FormValue("address"),
-		r.FormValue("state"),
-		r.FormValue("district"),
-		r.FormValue("taluka"),
-		r.FormValue("gender"),
-		r.FormValue("dob"),
-		fileName,
-		handicapped,
-		r.FormValue("email"),
-		r.FormValue("mobileNumber"),
-		r.FormValue("bloodGroup"),
+	result, err := config.DB.Exec(
+		query,
+		r.FormValue("studentName"),r.FormValue("address"),r.FormValue("state"),
+		r.FormValue("district"),r.FormValue("taluka"),r.FormValue("gender"),
+		r.FormValue("dob"),fileName,handicapped,r.FormValue("email"),
+		r.FormValue("mobileNumber"),r.FormValue("bloodGroup"),
 	)
-
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	id, _ := result.LastInsertId()
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"id": strconv.FormatInt(id, 10), "message": "Student created"})
+	lastID, _ := result.LastInsertId()
+
+	session, _ := config.Store.Get(r, "student-session")
+
+	var studentIDs []string
+	if session.Values["student_ids"] != nil {
+		studentIDs = session.Values["student_ids"].([]string)
+	}
+
+	studentIDs = append(studentIDs, strconv.FormatInt(lastID, 10))
+	session.Values["student_ids"] = studentIDs
+	session.Save(r, w)
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Student created and stored in session",
+	})
 }
 
 func GetAllStudents(w http.ResponseWriter, r *http.Request) {
@@ -75,34 +80,100 @@ func GetAllStudents(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var s models.Student
 		var id int
-		rows.Scan(&id, &s.StudentName, &s.Address, &s.State, &s.District, &s.Taluka, &s.Gender, &s.DOB, &s.Photo, &s.Handicapped, &s.Email, &s.MobileNumber, &s.BloodGroup)
+		rows.Scan(
+			&id,&s.StudentName,&s.Address,&s.State,&s.District,
+			&s.Taluka,&s.Gender,&s.DOB,&s.Photo,&s.Handicapped,
+			&s.Email,&s.MobileNumber,&s.BloodGroup,
+		)
 		s.ID = strconv.Itoa(id)
 		students = append(students, s)
 	}
+
 	json.NewEncoder(w).Encode(students)
 }
 
 func UpdateStudent(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
+	session, _ := config.Store.Get(r, "student-session")
+
+	ids, ok := session.Values["student_ids"].([]string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	var s models.Student
 	json.NewDecoder(r.Body).Decode(&s)
 
-	_, err := config.DB.Exec(`UPDATE students SET studentName=?, address=?, state=?, district=?, taluka=?, gender=?, dob=?, photo=?, handicapped=?, email=?, mobileNumber=?, bloodGroup=? WHERE id=?`,
-		s.StudentName, s.Address, s.State, s.District, s.Taluka, s.Gender, s.DOB, s.Photo, s.Handicapped, s.Email, s.MobileNumber, s.BloodGroup, params["id"])
+	authorized := false
+	for _, id := range ids {
+		if id == s.ID {
+			authorized = true
+			break
+		}
+	}
+
+	if !authorized {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	_, err := config.DB.Exec(`
+		UPDATE students SET
+		studentName=?, address=?, state=?, district=?, taluka=?, gender=?, dob=?,
+		photo=?, handicapped=?, email=?, mobileNumber=?, bloodGroup=?
+		WHERE id=?`,
+		s.StudentName,s.Address,s.State,s.District,s.Taluka,s.Gender,
+		s.DOB,s.Photo,s.Handicapped,s.Email,s.MobileNumber,s.BloodGroup,s.ID,
+	)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode("Student updated")
+
+	json.NewEncoder(w).Encode("Student updated successfully")
 }
 
 func DeleteStudent(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	_, err := config.DB.Exec("DELETE FROM students WHERE id=?", params["id"])
+	session, _ := config.Store.Get(r, "student-session")
+
+	ids, ok := session.Values["student_ids"].([]string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var s models.Student
+	json.NewDecoder(r.Body).Decode(&s)
+
+	authorized := false
+	for _, id := range ids {
+		if id == s.ID {
+			authorized = true
+			break
+		}
+	}
+
+	if !authorized {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	_, err := config.DB.Exec("DELETE FROM students WHERE id=?", s.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode("Student deleted")
+
+	var updated []string
+	for _, id := range ids {
+		if id != s.ID {
+			updated = append(updated, id)
+		}
+	}
+
+	session.Values["student_ids"] = updated
+	session.Save(r, w)
+
+	json.NewEncoder(w).Encode("Student deleted successfully")
 }

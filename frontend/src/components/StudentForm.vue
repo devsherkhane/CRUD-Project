@@ -105,7 +105,8 @@ const submitForm = async () => {
 
     const response = await fetch('http://localhost:8000/students', {
       method: 'POST',
-      body: formData
+      body: formData,
+      credentials: 'include' 
     });
 
     if (response.ok) {
