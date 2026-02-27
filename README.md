@@ -14,3 +14,4 @@ A full-stack application built with:
 ## How to Run
 1. Start Go backend
 2. Run Vue frontend
+
